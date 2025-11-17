@@ -3,64 +3,63 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Camera With Image Overlay</title>
+  <title>Camera With Advanced Image Overlay</title>
 
   <style>
-    body {
+    body, html {
       margin: 0;
-      overflow: hidden;
+      height: 100%;
       background: #000;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
+      overflow: hidden;
+      touch-action: none; /* Prevent browser scrolling/zoom while editing overlay */
     }
 
     #container {
       position: relative;
-      width: 95%;
-      height: 90%;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      touch-action: none;
     }
 
     video {
       width: 100%;
       height: 100%;
       object-fit: cover;
-      border: 2px solid #fff;
-      border-radius: 10px;
       transition: transform 0.2s ease;
     }
 
-    /* NEW: Flip horizontally */
     .flipped {
       transform: scaleX(-1);
     }
 
     #overlay {
       position: absolute;
-      top: 20px;
-      left: 20px;
       border: 2px dashed #fff;
-      cursor: move;
+      top: 50px;
+      left: 50px;
       display: none;
+      touch-action: none;
     }
 
-    #overlay img {
+    #overlayImg {
       width: 200px;
       height: auto;
       display: block;
       pointer-events: none;
+      transform-origin: center center;
     }
 
     .resize-handle {
-      width: 15px;
-      height: 15px;
+      width: 18px;
+      height: 18px;
       background: #fff;
       border-radius: 50%;
       position: absolute;
-      bottom: -8px;
-      right: -8px;
+      bottom: -9px;
+      right: -9px;
       cursor: se-resize;
+      z-index: 10;
     }
 
     #controls {
@@ -70,26 +69,23 @@
       transform: translateX(-50%);
       background: rgba(0,0,0,0.7);
       padding: 10px 15px;
-      border-radius: 10px;
+      border-radius: 12px;
       color: #fff;
       display: flex;
       gap: 15px;
       align-items: center;
+      z-index: 9999;
       font-size: 14px;
-    }
-
-    input[type="file"] {
-      color: white;
     }
   </style>
 </head>
 <body>
-  
+
   <div id="container">
     <video id="camera" autoplay playsinline></video>
 
     <div id="overlay">
-      <img id="overlayImg" src="">
+      <img id="overlayImg">
       <div class="resize-handle"></div>
     </div>
   </div>
@@ -110,15 +106,21 @@
       Lock Ratio
     </label>
 
-    <!-- NEW control -->
     <label>
       <input type="checkbox" id="flipCamera">
       Flip Camera
     </label>
+
+    <label>
+      <input type="checkbox" id="flipOverlay">
+      Flip Overlay
+    </label>
   </div>
 
   <script>
-    // Start Camera
+    /************************************
+     CAMERA START
+    *************************************/
     async function startCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -126,13 +128,16 @@
           audio: false
         });
         document.getElementById("camera").srcObject = stream;
-      } catch (err) {
-        console.error("Camera access denied or unavailable:", err);
-        alert("Unable to access camera.");
+      } catch (e) {
+        alert("Camera access blocked");
       }
     }
     startCamera();
 
+    /************************************
+     ELEMENTS
+    *************************************/
+    const camera = document.getElementById("camera");
     const overlay = document.getElementById("overlay");
     const overlayImg = document.getElementById("overlayImg");
     const resizeHandle = document.querySelector(".resize-handle");
@@ -140,14 +145,32 @@
     const opacitySlider = document.getElementById("opacitySlider");
     const lockRatio = document.getElementById("lockRatio");
     const flipCamera = document.getElementById("flipCamera");
-    const camera = document.getElementById("camera");
+    const flipOverlay = document.getElementById("flipOverlay");
 
+    /************************************
+     STATE
+    *************************************/
     let isDragging = false;
     let isResizing = false;
-    let offsetX, offsetY;
-    let originalWidth, originalHeight, aspectRatio;
 
-    // Upload Image
+    let startX, startY;
+    let offsetX, offsetY;
+
+    let startWidth, startHeight;
+    let aspect = 1;
+
+    /* Gesture state */
+    let gestureActive = false;
+    let initialDistance = 0;
+    let initialAngle = 0;
+    let initialScale = 1;
+    let currentScale = 1;
+    let initialRotation = 0;
+    let currentRotation = 0;
+
+    /************************************
+     UPLOAD IMAGE
+    *************************************/
     imageUpload.addEventListener("change", e => {
       const file = e.target.files[0];
       if (!file) return;
@@ -156,67 +179,188 @@
       reader.onload = evt => {
         overlayImg.src = evt.target.result;
         overlay.style.display = "block";
-
         overlayImg.onload = () => {
-          originalWidth = overlayImg.naturalWidth;
-          originalHeight = overlayImg.naturalHeight;
-          aspectRatio = originalWidth / originalHeight;
-
+          aspect = overlayImg.naturalWidth / overlayImg.naturalHeight;
           overlayImg.style.width = "200px";
           overlayImg.style.height = "auto";
+          currentScale = 1;
+          currentRotation = 0;
+          updateTransform();
         };
       };
       reader.readAsDataURL(file);
     });
 
-    // Drag overlay
+    /************************************
+     DESKTOP DRAG
+    *************************************/
     overlay.addEventListener("mousedown", e => {
       if (e.target === resizeHandle) return;
       isDragging = true;
-      offsetX = e.clientX - overlay.offsetLeft;
-      offsetY = e.clientY - overlay.offsetTop;
+      startX = e.clientX;
+      startY = e.clientY;
+      offsetX = overlay.offsetLeft;
+      offsetY = overlay.offsetTop;
     });
 
-    // Resize overlay
+    /************************************
+     DESKTOP RESIZE
+    *************************************/
     resizeHandle.addEventListener("mousedown", e => {
+      e.stopPropagation();
       isResizing = true;
-      originalWidth = overlayImg.offsetWidth;
-      originalHeight = overlayImg.offsetHeight;
-      aspectRatio = originalWidth / originalHeight;
+      startX = e.clientX;
+      startY = e.clientY;
+      startWidth = overlayImg.offsetWidth;
+      startHeight = overlayImg.offsetHeight;
+    });
+
+    /************************************
+     MOBILE TOUCH DRAG
+    *************************************/
+    overlay.addEventListener("touchstart", e => {
+      if (e.touches.length === 1 && !gestureActive) {
+        const t = e.touches[0];
+        isDragging = true;
+        startX = t.clientX;
+        startY = t.clientY;
+        offsetX = overlay.offsetLeft;
+        offsetY = overlay.offsetTop;
+      }
+    });
+
+    overlay.addEventListener("touchmove", e => {
+      if (isDragging && e.touches.length === 1 && !gestureActive) {
+        const t = e.touches[0];
+        overlay.style.left = `${offsetX + (t.clientX - startX)}px`;
+        overlay.style.top = `${offsetY + (t.clientY - startY)}px`;
+        keepOverlayInsideBounds();
+      }
+    });
+
+    /************************************
+     MOBILE TOUCH RESIZE (handle)
+    *************************************/
+    resizeHandle.addEventListener("touchstart", e => {
+      const t = e.touches[0];
+      isResizing = true;
+      startX = t.clientX;
+      startY = t.clientY;
+      startWidth = overlayImg.offsetWidth;
+      startHeight = overlayImg.offsetHeight;
       e.stopPropagation();
     });
 
-    document.addEventListener("mousemove", e => {
-      if (isDragging) {
-        overlay.style.left = `${e.clientX - offsetX}px`;
-        overlay.style.top = `${e.clientY - offsetY}px`;
-      }
-      if (isResizing) {
-        let newWidth = e.clientX - overlay.getBoundingClientRect().left;
-        let newHeight = e.clientY - overlay.getBoundingClientRect().top;
+    resizeHandle.addEventListener("touchmove", e => {
+      if (!isResizing) return;
+      const t = e.touches[0];
 
-        if (lockRatio.checked) newHeight = newWidth / aspectRatio;
+      let newWidth = startWidth + (t.clientX - startX);
+      let newHeight = lockRatio.checked ? newWidth / aspect : startHeight + (t.clientY - startY);
 
-        overlayImg.style.width = `${newWidth}px`;
-        overlayImg.style.height = `${newHeight}px`;
+      overlayImg.style.width = `${newWidth}px`;
+      overlayImg.style.height = `${newHeight}px`;
+
+      keepOverlayInsideBounds();
+    });
+
+    /************************************
+     MULTI-TOUCH PINCH + ROTATE
+    *************************************/
+    overlay.addEventListener("touchstart", e => {
+      if (e.touches.length === 2) {
+        gestureActive = true;
+
+        const [t1, t2] = e.touches;
+        initialDistance = getDistance(t1, t2);
+        initialAngle = getAngle(t1, t2);
+
+        initialScale = currentScale;
+        initialRotation = currentRotation;
       }
     });
 
+    overlay.addEventListener("touchmove", e => {
+      if (e.touches.length === 2) {
+        const [t1, t2] = e.touches;
+
+        const newDist = getDistance(t1, t2);
+        const newAngle = getAngle(t1, t2);
+
+        currentScale = initialScale * (newDist / initialDistance);
+        currentRotation = initialRotation + (newAngle - initialAngle);
+
+        updateTransform();
+      }
+    });
+
+    /************************************
+     STOP INTERACTIONS
+    *************************************/
     document.addEventListener("mouseup", () => {
       isDragging = false;
       isResizing = false;
     });
 
-    // Opacity slider
+    document.addEventListener("touchend", () => {
+      if (event.touches.length < 2) gestureActive = false;
+      isDragging = false;
+      isResizing = false;
+    });
+
+    /************************************
+     TRANSFORM UPDATE
+    *************************************/
+    function updateTransform() {
+      let flip = flipOverlay.checked ? -1 : 1;
+
+      overlayImg.style.transform =
+        `scale(${currentScale * flip}, ${currentScale}) rotate(${currentRotation}deg)`;
+
+      keepOverlayInsideBounds();
+    }
+
+    /************************************
+     ENSURE OVERLAY STAYS INSIDE CAMERA
+    *************************************/
+    function keepOverlayInsideBounds() {
+      const cont = document.getElementById("container").getBoundingClientRect();
+      const box = overlay.getBoundingClientRect();
+
+      if (box.left < cont.left) overlay.style.left = "0px";
+      if (box.top < cont.top) overlay.style.top = "0px";
+      if (box.right > cont.right)
+        overlay.style.left = `${cont.width - box.width}px`;
+      if (box.bottom > cont.bottom)
+        overlay.style.top = `${cont.height - box.height}px`;
+    }
+
+    /************************************
+     HELPER FUNCTIONS
+    *************************************/
+    function getDistance(t1, t2) {
+      return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+    }
+
+    function getAngle(t1, t2) {
+      return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX) * 180 / Math.PI;
+    }
+
+    /************************************
+     OPACITY + CAMERA FLIP
+    *************************************/
     opacitySlider.addEventListener("input", () => {
       overlay.style.opacity = opacitySlider.value;
     });
 
-    // NEW: Flip camera horizontally
     flipCamera.addEventListener("change", () => {
       camera.classList.toggle("flipped", flipCamera.checked);
     });
-  </script>
 
+    flipOverlay.addEventListener("change", () => {
+      updateTransform();
+    });
+
+  </script>
 </body>
 </html>
