@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Camera With Image Overlay</title>
+
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    #container {
+      position: relative;
+      width: 95%;
+      height: 90%;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border: 2px solid #fff;
+      border-radius: 10px;
+      transition: transform 0.2s ease;
+    }
+
+    /* NEW: Flip horizontally */
+    .flipped {
+      transform: scaleX(-1);
+    }
+
+    #overlay {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      border: 2px dashed #fff;
+      cursor: move;
+      display: none;
+    }
+
+    #overlay img {
+      width: 200px;
+      height: auto;
+      display: block;
+      pointer-events: none;
+    }
+
+    .resize-handle {
+      width: 15px;
+      height: 15px;
+      background: #fff;
+      border-radius: 50%;
+      position: absolute;
+      bottom: -8px;
+      right: -8px;
+      cursor: se-resize;
+    }
+
+    #controls {
+      position: fixed;
+      bottom: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.7);
+      padding: 10px 15px;
+      border-radius: 10px;
+      color: #fff;
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      font-size: 14px;
+    }
+
+    input[type="file"] {
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  
+  <div id="container">
+    <video id="camera" autoplay playsinline></video>
+
+    <div id="overlay">
+      <img id="overlayImg" src="">
+      <div class="resize-handle"></div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <label style="cursor:pointer">
+      Upload Image
+      <input type="file" id="imageUpload" accept="image/*" style="display:none">
+    </label>
+
+    <label>
+      Opacity
+      <input type="range" id="opacitySlider" min="0" max="1" step="0.05" value="1">
+    </label>
+
+    <label>
+      <input type="checkbox" id="lockRatio" checked>
+      Lock Ratio
+    </label>
+
+    <!-- NEW control -->
+    <label>
+      <input type="checkbox" id="flipCamera">
+      Flip Camera
+    </label>
+  </div>
+
+  <script>
+    // Start Camera
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+          audio: false
+        });
+        document.getElementById("camera").srcObject = stream;
+      } catch (err) {
+        console.error("Camera access denied or unavailable:", err);
+        alert("Unable to access camera.");
+      }
+    }
+    startCamera();
+
+    const overlay = document.getElementById("overlay");
+    const overlayImg = document.getElementById("overlayImg");
+    const resizeHandle = document.querySelector(".resize-handle");
+    const imageUpload = document.getElementById("imageUpload");
+    const opacitySlider = document.getElementById("opacitySlider");
+    const lockRatio = document.getElementById("lockRatio");
+    const flipCamera = document.getElementById("flipCamera");
+    const camera = document.getElementById("camera");
+
+    let isDragging = false;
+    let isResizing = false;
+    let offsetX, offsetY;
+    let originalWidth, originalHeight, aspectRatio;
+
+    // Upload Image
+    imageUpload.addEventListener("change", e => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = evt => {
+        overlayImg.src = evt.target.result;
+        overlay.style.display = "block";
+
+        overlayImg.onload = () => {
+          originalWidth = overlayImg.naturalWidth;
+          originalHeight = overlayImg.naturalHeight;
+          aspectRatio = originalWidth / originalHeight;
+
+          overlayImg.style.width = "200px";
+          overlayImg.style.height = "auto";
+        };
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Drag overlay
+    overlay.addEventListener("mousedown", e => {
+      if (e.target === resizeHandle) return;
+      isDragging = true;
+      offsetX = e.clientX - overlay.offsetLeft;
+      offsetY = e.clientY - overlay.offsetTop;
+    });
+
+    // Resize overlay
+    resizeHandle.addEventListener("mousedown", e => {
+      isResizing = true;
+      originalWidth = overlayImg.offsetWidth;
+      originalHeight = overlayImg.offsetHeight;
+      aspectRatio = originalWidth / originalHeight;
+      e.stopPropagation();
+    });
+
+    document.addEventListener("mousemove", e => {
+      if (isDragging) {
+        overlay.style.left = `${e.clientX - offsetX}px`;
+        overlay.style.top = `${e.clientY - offsetY}px`;
+      }
+      if (isResizing) {
+        let newWidth = e.clientX - overlay.getBoundingClientRect().left;
+        let newHeight = e.clientY - overlay.getBoundingClientRect().top;
+
+        if (lockRatio.checked) newHeight = newWidth / aspectRatio;
+
+        overlayImg.style.width = `${newWidth}px`;
+        overlayImg.style.height = `${newHeight}px`;
+      }
+    });
+
+    document.addEventListener("mouseup", () => {
+      isDragging = false;
+      isResizing = false;
+    });
+
+    // Opacity slider
+    opacitySlider.addEventListener("input", () => {
+      overlay.style.opacity = opacitySlider.value;
+    });
+
+    // NEW: Flip camera horizontally
+    flipCamera.addEventListener("change", () => {
+      camera.classList.toggle("flipped", flipCamera.checked);
+    });
+  </script>
+
+</body>
+</html>
