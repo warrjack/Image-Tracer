@@ -4,459 +4,135 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Camera Overlay Editor</title>
+
 <style>
 body, html {
-margin: 0;
-height: 100%;
-background: #000;
-overflow: hidden;
-font-family: Helvetica, Arial, sans-serif;
+  margin: 0;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  font-family: Helvetica, Arial, sans-serif;
 }
 
 #container {
-position: relative;
-width: 100vw;
-height: 100vh;
-overflow: hidden;
-touch-action: none;
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  touch-action: none; /* ★★ FIXED — allow gestures */
 }
 
 video {
-width: 100%;
-height: 100%;
-object-fit: cover;
-transition: transform 0.2s ease;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.2s ease;
 }
 
-.flipped {
-transform: scaleX(-1);
-}
+.flipped { transform: scaleX(-1); }
 
+/* Overlay */
 #overlay {
-position: absolute;
-border: 2px solid rgba(255,255,255,0.7);
-box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-display: none;
-touch-action: none;
-top: 50px;
-left: 50px;
-border-radius: 8px;
+  position: absolute;
+  border: 2px solid rgba(255,255,255,0.7);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+  display: none;
+  touch-action: none; /* ★ FIXED: enable gestures */
+  top: 50px;
+  left: 50px;
+  border-radius: 8px;
 }
 
 #overlayImg {
-width: 100%;
-height: 100%;
-display: block;
-pointer-events: none;
-transform-origin: center center;
-border-radius: 6px;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* ★★ FIXED — allow overlay to receive gestures */
+  border-radius: 6px;
 }
 
-/* Corner resize handles */
+/* Corner handles */
 .overlay-handle {
-width: 14px;
-height: 14px;
-background: #fff;
-border: 2px solid #000;
-border-radius: 50%;
-position: absolute;
-cursor: nwse-resize;
-z-index: 10;
-transition: transform 0.2s;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border: 2px solid #000;
+  border-radius: 50%;
+  position: absolute;
+  z-index: 10;
 }
 
-.overlay-handle:hover {
-transform: scale(1.3);
-}
+.overlay-handle.tl { top: -9px; left: -9px; }
+.overlay-handle.tr { top: -9px; right: -9px; }
+.overlay-handle.bl { bottom: -9px; left: -9px; }
+.overlay-handle.br { bottom: -9px; right: -9px; }
 
-/* 4 corners */
-.overlay-handle.tl { top: -9px; left: -9px; cursor: nwse-resize; }
-.overlay-handle.tr { top: -9px; right: -9px; cursor: nesw-resize; }
-.overlay-handle.bl { bottom: -9px; left: -9px; cursor: nesw-resize; }
-.overlay-handle.br { bottom: -9px; right: -9px; cursor: nwse-resize; }
-
-
-.resize-handle {
-width: 18px;
-height: 18px;
-background: #fff;
-border-radius: 50%;
-position: absolute;
-bottom: -9px;
-right: -9px;
-cursor: se-resize;
-z-index: 10;
-}
-
-/* Controls Panel */
+/* Control panel */
 .control-panel {
-position: fixed;
-bottom: 10px;
-left: 50%;
-transform: translateX(-50%);
-background: rgba(0,0,0,0.7);
-border-radius: 12px;
-color: #fff;
-z-index: 9999;
-font-size: 14px;
-overflow: hidden;
+  position: fixed;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.7);
+  border-radius: 12px;
+  color: #fff;
+  z-index: 9999;
+  font-size: 14px;
 }
 
-.panel-header {
-padding: 8px 12px;
-cursor: pointer;
-user-select: none;
-font-weight: bold;
-background: rgba(255,255,255,0.1);
-display: flex;
-justify-content: space-between;
-align-items: center;
-}
-
+/* Start CLOSED → display:none; ★★ FIXED */
 .panel-body {
-display: none;
-padding: 8px 12px;
-display: flex;
-flex-wrap: wrap;
-gap: 10px;
-align-items: center;
-}
-
-.panel-body label {
-display: flex;
-align-items: center;
-gap: 5px;
-cursor: pointer;
-}
-
-input[type="range"], input[type="color"] {
-cursor: pointer;
-}
-
-.panel-body input[type="checkbox"] {
-cursor: pointer;
+  display: none;
+  padding: 8px 12px;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
 }
 </style>
 </head>
+
 <body>
-
 <div id="container">
-<video id="camera" autoplay playsinline></video>
-<div id="overlay">
-<img id="overlayImg">
-<div class="overlay-handle tl"></div>
-<div class="overlay-handle tr"></div>
-<div class="overlay-handle bl"></div>
-<div class="overlay-handle br"></div>
+  <video id="camera" autoplay playsinline></video>
+
+  <div id="overlay">
+    <img id="overlayImg">
+    <div class="overlay-handle tl"></div>
+    <div class="overlay-handle tr"></div>
+    <div class="overlay-handle bl"></div>
+    <div class="overlay-handle br"></div>
+  </div>
 </div>
 
-</div>
-
-<!-- Camera Controls Panel -->
+<!-- Camera Panel -->
 <div class="control-panel" id="cameraPanel">
-<div class="panel-header">
-Camera Controls
-<span id="cameraToggle">▼</span>
-</div>
-<div class="panel-body" id="cameraBody">
-<label>
-<input type="checkbox" id="flipCamera">
-Flip Camera
-</label>
-</div>
+  <div class="panel-header">
+    Camera Controls
+    <span id="cameraToggle">▼</span>
+  </div>
+  <div class="panel-body" id="cameraBody">
+    <label><input type="checkbox" id="flipCamera"> Flip Camera</label>
+  </div>
 </div>
 
-<!-- Photo Editing Panel -->
+<!-- Photo Panel -->
 <div class="control-panel" id="photoPanel" style="bottom: 90px;">
-<div class="panel-header">
-Photo Editing
-<span id="photoToggle">▼</span>
-</div>
-<div class="panel-body" id="photoBody">
-<label style="cursor:pointer">
-Upload Image
-<input type="file" id="imageUpload" accept="image/*" style="display:none">
-</label>
+  <div class="panel-header">
+    Photo Editing
+    <span id="photoToggle">▼</span>
+  </div>
+  <div class="panel-body" id="photoBody">
+    <label style="cursor:pointer">
+      Upload Image
+      <input type="file" id="imageUpload" accept="image/*" style="display:none">
+    </label>
 
-<label>
-Opacity
-<input type="range" id="opacitySlider" min="0" max="1" step="0.05" value="1">
-</label>
-
-<label>
-<input type="checkbox" id="lockRatio" checked>
-Lock Ratio
-</label>
-
-<label>
-<input type="checkbox" id="flipOverlay">
-Flip Overlay
-</label>
-
-<label>
-<input type="checkbox" id="removeColor">
-Remove Color
-</label>
-
-<label>
-Key Color
-<input type="color" id="keyColor" value="#ffffff">
-</label>
-
-<label>
-Tolerance
-<input type="range" id="tolerance" min="0" max="100" value="20">
-</label>
-</div>
+    <label>Opacity <input type="range" id="opacitySlider" min="0" max="1" step="0.05" value="1"></label>
+    <label><input type="checkbox" id="lockRatio" checked> Lock Ratio</label>
+    <label><input type="checkbox" id="flipOverlay"> Flip Overlay</label>
+    <label><input type="checkbox" id="removeColor"> Remove Color</label>
+    <label>Key Color <input type="color" id="keyColor" value="#ffffff"></label>
+    <label>Tolerance <input type="range" id="tolerance" min="0" max="100" value="20"></label>
+  </div>
 </div>
 
 <script>
-/************************************
-PANEL TOGGLE
-*************************************/
-document.getElementById("cameraToggle").addEventListener("click",()=>{
-const body=document.getElementById("cameraBody");
-body.style.display = body.style.display==="flex"?"none":"flex";
-document.getElementById("cameraToggle").textContent = body.style.display==="flex"?"▲":"▼";
-});
-
-document.getElementById("photoToggle").addEventListener("click",()=>{
-const body=document.getElementById("photoBody");
-body.style.display = body.style.display==="flex"?"none":"flex";
-document.getElementById("photoToggle").textContent = body.style.display==="flex"?"▲":"▼";
-});
-
-/************************************
-CAMERA START
-*************************************/
-async function startCamera() {
-try {
-const stream = await navigator.mediaDevices.getUserMedia({
-video: { facingMode: "environment" },
-audio: false
-});
-document.getElementById("camera").srcObject = stream;
-} catch (e) {
-alert("Camera access blocked");
-}
-}
-startCamera();
-
-/************************************
-ELEMENTS
-*************************************/
-const camera = document.getElementById("camera");
-const overlay = document.getElementById("overlay");
-const overlayImg = document.getElementById("overlayImg");
-const resizeHandle = document.querySelector(".resize-handle");
-const imageUpload = document.getElementById("imageUpload");
-const opacitySlider = document.getElementById("opacitySlider");
-const lockRatio = document.getElementById("lockRatio");
-const flipCamera = document.getElementById("flipCamera");
-const flipOverlay = document.getElementById("flipOverlay");
-const removeColor = document.getElementById("removeColor");
-const keyColor = document.getElementById("keyColor");
-const toleranceSlider = document.getElementById("tolerance");
-
-let originalImageSrc = null;
-
-/************************************
-STATE
-*************************************/
-let isDragging=false, isResizing=false;
-let startX,startY,offsetX,offsetY;
-let startWidth,startHeight;
-let aspect=1;
-
-let gestureActive=false;
-let initialDistance=0,initialAngle=0;
-let initialScale=1,currentScale=1;
-let initialRotation=0,currentRotation=0;
-
-/************************************
-IMAGE UPLOAD & PROCESSING
-*************************************/
-imageUpload.addEventListener("change", async e => {
-const file = e.target.files[0];
-if (!file) return;
-
-const reader = new FileReader();
-reader.onload = async evt => {
-originalImageSrc = evt.target.result;
-let imgSrc = originalImageSrc;
-
-if (removeColor.checked) {
-imgSrc = await removeSpecificColorFromImage(originalImageSrc, keyColor.value, Number(toleranceSlider.value));
-}
-
-overlayImg.src = imgSrc;
-overlay.style.display = "block";
-
-overlayImg.onload = () => {
-aspect = overlayImg.naturalWidth / overlayImg.naturalHeight;
-overlay.style.width = "200px";
-overlay.style.height = `${200 / aspect}px`;
-overlayImg.style.width = "100%";
-overlayImg.style.height = "100%";
-currentScale=1; currentRotation=0;
-updateTransform();
-};
-};
-reader.readAsDataURL(file);
-});
-
-/************************************
-COLOR REMOVAL
-*************************************/
-async function removeSpecificColorFromImage(src, keyHex, tolerance) {
-return new Promise(resolve => {
-const img = new Image();
-img.crossOrigin = "anonymous";
-img.onload = () => {
-const canvas = document.createElement("canvas");
-const ctx = canvas.getContext("2d");
-canvas.width = img.width;
-canvas.height = img.height;
-ctx.drawImage(img, 0, 0);
-const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-const data = imgData.data;
-const rKey=parseInt(keyHex.substr(1,2),16);
-const gKey=parseInt(keyHex.substr(3,2),16);
-const bKey=parseInt(keyHex.substr(5,2),16);
-for(let i=0;i<data.length;i+=4){
-const r=data[i],g=data[i+1],b=data[i+2];
-const distance = Math.sqrt((r-rKey)**2 + (g-gKey)**2 + (b-bKey)**2);
-if(distance<=tolerance) data[i+3]=0;
-}
-ctx.putImageData(imgData,0,0);
-resolve(canvas.toDataURL("image/png"));
-};
-img.src=src;
-});
-}
-
-async function reprocessColorRemoval(){
-if(!originalImageSrc) return;
-if(removeColor.checked){
-overlayImg.src = await removeSpecificColorFromImage(originalImageSrc, keyColor.value, Number(toleranceSlider.value));
-} else overlayImg.src = originalImageSrc;
-}
-removeColor.addEventListener("change", reprocessColorRemoval);
-keyColor.addEventListener("input", reprocessColorRemoval);
-toleranceSlider.addEventListener("input", reprocessColorRemoval);
-
-/************************************
-DRAG & RESIZE
-*************************************/
-overlay.addEventListener("mousedown", e=>{
-if(e.target===resizeHandle) return;
-isDragging=true; startX=e.clientX; startY=e.clientY;
-offsetX=overlay.offsetLeft; offsetY=overlay.offsetTop;
-e.preventDefault();
-});
-document.addEventListener("mousemove", e=>{
-if(!isDragging) return;
-overlay.style.left=`${offsetX+(e.clientX-startX)}px`;
-overlay.style.top=`${offsetY+(e.clientY-startY)}px`;
-keepOverlayInsideBounds();
-});
-document.addEventListener("mouseup",()=>{isDragging=false;});
-
-/* Resize handle */
-resizeHandle.addEventListener("mousedown", e=>{
-e.stopPropagation();
-isResizing=true; startX=e.clientX; startY=e.clientY;
-startWidth=overlay.offsetWidth; startHeight=overlay.offsetHeight;
-});
-document.addEventListener("mousemove", e=>{
-if(!isResizing) return;
-let newWidth=startWidth+(e.clientX-startX);
-let newHeight=lockRatio.checked ? newWidth/aspect : startHeight+(e.clientY-startY);
-overlay.style.width=`${newWidth}px`;
-overlay.style.height=`${newHeight}px`;
-keepOverlayInsideBounds();
-});
-document.addEventListener("mouseup", ()=>{isResizing=false;});
-
-/************************************
-TOUCH & GESTURE SUPPORT
-*************************************/
-overlay.addEventListener("touchstart", e=>{
-if(e.touches.length===1 && !gestureActive){
-const t=e.touches[0];
-isDragging=true; startX=t.clientX; startY=t.clientY;
-offsetX=overlay.offsetLeft; offsetY=overlay.offsetTop;
-}
-if(e.touches.length===2){
-gestureActive=true;
-const [t1,t2]=e.touches;
-initialDistance=getDistance(t1,t2);
-initialAngle=getAngle(t1,t2);
-initialScale=currentScale;
-initialRotation=currentRotation;
-}
-});
-overlay.addEventListener("touchmove", e=>{
-if(isDragging && e.touches.length===1 && !gestureActive){
-const t=e.touches[0];
-overlay.style.left=`${offsetX+(t.clientX-startX)}px`;
-overlay.style.top=`${offsetY+(t.clientY-startY)}px`;
-keepOverlayInsideBounds();
-}
-if(e.touches.length===2){
-const [t1,t2]=e.touches;
-const newDist=getDistance(t1,t2);
-const newAngle=getAngle(t1,t2);
-currentScale = initialScale*(newDist/initialDistance);
-currentRotation = initialRotation+(newAngle-initialAngle);
-updateTransform();
-}
-});
-overlay.addEventListener("touchend", e=>{
-if(e.touches.length<2) gestureActive=false;
-isDragging=false; isResizing=false;
-});
-
-/************************************
-MOUSE ZOOM & ROTATE
-*************************************/
-overlay.addEventListener("wheel", e=>{
-e.preventDefault();
-if(e.shiftKey){
-currentRotation += (e.deltaY<0?2:-2);
-} else currentScale = Math.max(0.1,currentScale+(e.deltaY<0?0.05:-0.05));
-updateTransform();
-});
-
-/************************************
-TRANSFORM UPDATE
-*************************************/
-function updateTransform(){
-let flip = flipOverlay.checked ? -1 : 1;
-overlay.style.transform = `scale(${currentScale*flip}) rotate(${currentRotation}deg)`;
-keepOverlayInsideBounds();
-}
-
-/************************************
-CAMERA FLIP & OPACITY
-*************************************/
-opacitySlider.addEventListener("input", ()=>overlay.style.opacity=opacitySlider.value);
-flipCamera.addEventListener("change", ()=>camera.classList.toggle("flipped",flipCamera.checked));
-flipOverlay.addEventListener("change", updateTransform);
-
-/************************************
-HELPERS
-*************************************/
-function getDistance(t1,t2){ return Math.hypot(t2.clientX-t1.clientX, t2.clientY-t1.clientY); }
-function getAngle(t1,t2){ return Math.atan2(t2.clientY-t1.clientY,t2.clientX-t1.clientX)*180/Math.PI; }
-function keepOverlayInsideBounds(){
-const cont=container.getBoundingClientRect();
-const box=overlay.getBoundingClientRect();
-if(box.left<cont.left) overlay.style.left="0px";
-if(box.top<cont.top) overlay.style.top="0px";
-if(box.right>cont.right) overlay.style.left=`${cont.width-box.width}px`;
-if(box.bottom>cont.bottom) overlay.style.top=`${cont.height-box.height}px`;
-}
-</script>
-</body>
-</html>
