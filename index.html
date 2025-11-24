@@ -136,3 +136,138 @@ video {
 </div>
 
 <script>
+/************************************
+  PANEL TOGGLE — now starts CLOSED
+*************************************/
+function setupPanel(toggleId, bodyId) {
+  const toggle = document.getElementById(toggleId);
+  const body = document.getElementById(bodyId);
+  toggle.addEventListener("click", () => {
+    const open = body.style.display !== "flex";
+    body.style.display = open ? "flex" : "none";
+    toggle.textContent = open ? "▲" : "▼";
+  });
+}
+
+setupPanel("cameraToggle", "cameraBody");
+setupPanel("photoToggle", "photoBody");
+
+/************************************
+  ELEMENTS
+*************************************/
+const camera = document.getElementById("camera");
+const overlay = document.getElementById("overlay");
+const overlayImg = document.getElementById("overlayImg");
+const imageUpload = document.getElementById("imageUpload");
+const lockRatio = document.getElementById("lockRatio");
+const opacitySlider = document.getElementById("opacitySlider");
+const flipOverlay = document.getElementById("flipOverlay");
+
+/************************************
+  CAMERA (must come AFTER the camera element exists)
+*************************************/
+navigator.mediaDevices.getUserMedia({ video: true })
+  .then(stream => {
+    camera.srcObject = stream;
+  })
+  .catch(err => {
+    console.error("Camera error:", err);
+  });
+
+
+/************************************
+  STATE
+*************************************/
+let isDragging = false;
+let startX, startY, offsetX, offsetY;
+let initialDistance = 0, initialAngle = 0;
+let initialScale = 1, currentScale = 1;
+let initialRotation = 0, currentRotation = 0;
+
+/************************************
+  TOUCH / GESTURE — ★★ FIXED
+*************************************/
+overlay.addEventListener("touchstart", e => {
+  e.preventDefault();
+
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    isDragging = true;
+    startX = t.clientX;
+    startY = t.clientY;
+    offsetX = overlay.offsetLeft;
+    offsetY = overlay.offsetTop;
+  }
+
+  if (e.touches.length === 2) {
+    const [a, b] = e.touches;
+    initialDistance = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+    initialAngle = Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX);
+    initialScale = currentScale;
+    initialRotation = currentRotation;
+  }
+});
+
+overlay.addEventListener("touchmove", e => {
+  e.preventDefault();
+
+  if (e.touches.length === 1 && isDragging) {
+    const t = e.touches[0];
+    overlay.style.left = offsetX + (t.clientX - startX) + "px";
+    overlay.style.top = offsetY + (t.clientY - startY) + "px";
+  }
+
+  if (e.touches.length === 2) {
+    const [a, b] = e.touches;
+    let dist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+    let angle = Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX);
+
+    currentScale = initialScale * (dist / initialDistance);
+    currentRotation = initialRotation + (angle - initialAngle) * 180 / Math.PI;
+
+    updateTransform();
+  }
+});
+
+overlay.addEventListener("touchend", () => {
+  isDragging = false;
+});
+
+/************************************
+  MOUSE WHEEL FOR ROTATE+ZOOM
+*************************************/
+overlay.addEventListener("wheel", e => {
+  e.preventDefault();
+  if (e.shiftKey) currentRotation += e.deltaY < 0 ? 3 : -3;
+  else currentScale += e.deltaY < 0 ? 0.05 : -0.05;
+
+  updateTransform();
+});
+
+/************************************
+  UPDATE TRANSFORMS
+*************************************/
+function updateTransform() {
+  const flip = flipOverlay.checked ? -1 : 1;
+  overlay.style.transform = `scale(${currentScale * flip}) rotate(${currentRotation}deg)`;
+}
+
+opacitySlider.addEventListener("input", () => overlay.style.opacity = opacitySlider.value);
+flipOverlay.addEventListener("change", updateTransform);
+
+/************************************
+  IMAGE UPLOAD
+*************************************/
+imageUpload.addEventListener("change", e => {
+  let file = e.target.files[0];
+  if (!file) return;
+  let reader = new FileReader();
+  reader.onload = evt => {
+    overlayImg.src = evt.target.result;
+    overlay.style.display = "block";
+  };
+  reader.readAsDataURL(file);
+});
+</script>
+</body>
+</html>
