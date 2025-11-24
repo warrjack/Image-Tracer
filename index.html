@@ -19,7 +19,7 @@ body, html {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  touch-action: none; /* ★★ FIXED — allow gestures */
+  touch-action: none;
 }
 
 video {
@@ -37,7 +37,7 @@ video {
   border: 2px solid rgba(255,255,255,0.7);
   box-shadow: 0 4px 15px rgba(0,0,0,0.5);
   display: none;
-  touch-action: none; /* ★ FIXED: enable gestures */
+  touch-action: none;
   top: 50px;
   left: 50px;
   border-radius: 8px;
@@ -46,7 +46,7 @@ video {
 #overlayImg {
   width: 100%;
   height: 100%;
-  pointer-events: none; /* ★★ FIXED — allow overlay to receive gestures */
+  pointer-events: none;
   border-radius: 6px;
 }
 
@@ -79,7 +79,6 @@ video {
   font-size: 14px;
 }
 
-/* Start CLOSED → display:none; ★★ FIXED */
 .panel-body {
   display: none;
   padding: 8px 12px;
@@ -111,6 +110,7 @@ video {
   </div>
   <div class="panel-body" id="cameraBody">
     <label><input type="checkbox" id="flipCamera"> Flip Camera</label>
+    <label><input type="checkbox" id="useRearCamera"> Use Rear Camera</label>
   </div>
 </div>
 
@@ -137,7 +137,7 @@ video {
 
 <script>
 /************************************
-  PANEL TOGGLE — now starts CLOSED
+  PANEL TOGGLE — starts CLOSED
 *************************************/
 function setupPanel(toggleId, bodyId) {
   const toggle = document.getElementById(toggleId);
@@ -162,21 +162,60 @@ const imageUpload = document.getElementById("imageUpload");
 const lockRatio = document.getElementById("lockRatio");
 const opacitySlider = document.getElementById("opacitySlider");
 const flipOverlay = document.getElementById("flipOverlay");
+const useRearCamera = document.getElementById("useRearCamera");
+const flipCamera = document.getElementById("flipCamera");
 
 /************************************
-  CAMERA (must come AFTER the camera element exists)
+  CAMERA — FRONT/BACK SWITCH
 *************************************/
-navigator.mediaDevices.getUserMedia({ video: true })
-  .then(stream => {
-    camera.srcObject = stream;
-  })
-  .catch(err => {
-    console.error("Camera error:", err);
-  });
+let currentStream = null;
 
+async function startCamera(useRear = false) {
+  // stop previous stream
+  if (currentStream) {
+    currentStream.getTracks().forEach(track => track.stop());
+  }
+
+  const constraints = {
+    video: {
+      facingMode: useRear ? { exact: "environment" } : "user"
+    }
+  };
+
+  try {
+    currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+    camera.srcObject = currentStream;
+
+    // Auto-mirror ONLY the front camera
+    camera.classList.toggle("flipped", !useRear);
+
+  } catch (err) {
+    console.error("Camera error:", err);
+
+    // fallback if rear cam isn't available
+    if (useRear) {
+      console.warn("Rear camera not available, falling back to front.");
+      useRearCamera.checked = false;
+      startCamera(false);
+    }
+  }
+}
+
+// Start with the front camera
+startCamera(false);
+
+// Handle toggle
+useRearCamera.addEventListener("change", e => {
+  startCamera(e.target.checked);
+});
+
+// Manual flip override
+flipCamera.addEventListener("change", () => {
+  camera.classList.toggle("flipped", flipCamera.checked);
+});
 
 /************************************
-  STATE
+  OVERLAY TRANSFORM STATE
 *************************************/
 let isDragging = false;
 let startX, startY, offsetX, offsetY;
@@ -185,7 +224,7 @@ let initialScale = 1, currentScale = 1;
 let initialRotation = 0, currentRotation = 0;
 
 /************************************
-  TOUCH / GESTURE — ★★ FIXED
+  TOUCH / GESTURE
 *************************************/
 overlay.addEventListener("touchstart", e => {
   e.preventDefault();
@@ -234,7 +273,7 @@ overlay.addEventListener("touchend", () => {
 });
 
 /************************************
-  MOUSE WHEEL FOR ROTATE+ZOOM
+  MOUSE WHEEL ROTATE/ZOOM
 *************************************/
 overlay.addEventListener("wheel", e => {
   e.preventDefault();
@@ -245,7 +284,7 @@ overlay.addEventListener("wheel", e => {
 });
 
 /************************************
-  UPDATE TRANSFORMS
+  APPLY TRANSFORM
 *************************************/
 function updateTransform() {
   const flip = flipOverlay.checked ? -1 : 1;
