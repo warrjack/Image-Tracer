@@ -6,12 +6,18 @@
 <title>Camera Overlay Editor</title>
 
 <style>
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
 body, html {
   margin: 0;
+  padding: 0;
   height: 100%;
   background: #000;
   overflow: hidden;
-  font-family: Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 #container {
@@ -26,65 +32,180 @@ video {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.2s ease;
 }
 
-.flipped { transform: scaleX(-1); }
+video.flipped {
+  transform: scaleX(-1);
+}
 
 /* Overlay */
 #overlay {
   position: absolute;
-  border: 2px solid rgba(255,255,255,0.7);
-  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
   display: none;
   touch-action: none;
-  top: 50px;
-  left: 50px;
-  border-radius: 8px;
+  pointer-events: none;
+  top: 50%;
+  left: 50%;
+  transform-origin: center center;
 }
 
 #overlayImg {
   width: 100%;
   height: 100%;
-  pointer-events: none;
-  border-radius: 6px;
+  display: block;
+  border-radius: 4px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
 }
 
-/* Corner handles */
-.overlay-handle {
-  width: 14px;
-  height: 14px;
-  background: #fff;
-  border: 2px solid #000;
-  border-radius: 50%;
-  position: absolute;
-  z-index: 10;
+/* Active state for overlay */
+#overlay.active {
+  pointer-events: auto;
+  outline: 2px solid rgba(255,255,255,0.5);
+  outline-offset: 4px;
 }
 
-.overlay-handle.tl { top: -9px; left: -9px; }
-.overlay-handle.tr { top: -9px; right: -9px; }
-.overlay-handle.bl { bottom: -9px; left: -9px; }
-.overlay-handle.br { bottom: -9px; right: -9px; }
-
-/* Control panel */
+/* Control panels */
 .control-panel {
   position: fixed;
-  bottom: 10px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0,0,0,0.7);
-  border-radius: 12px;
+  background: rgba(20, 20, 20, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
   color: #fff;
   z-index: 9999;
-  font-size: 14px;
+  font-size: 15px;
+  max-width: 90vw;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+.panel-header {
+  padding: 14px 20px;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.panel-toggle {
+  font-size: 12px;
+  opacity: 0.7;
+  transition: transform 0.2s;
+}
+
+.panel-toggle.open {
+  transform: rotate(180deg);
 }
 
 .panel-body {
   display: none;
-  padding: 8px 12px;
-  flex-wrap: wrap;
-  gap: 10px;
+  padding: 16px 20px;
+  gap: 16px;
+  flex-direction: column;
+}
+
+.panel-body.open {
+  display: flex;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.control-row {
+  display: flex;
   align-items: center;
+  gap: 12px;
+  min-height: 36px;
+}
+
+label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  flex: 1;
+}
+
+input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: #4A9EFF;
+}
+
+input[type="range"] {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.2);
+  outline: none;
+  cursor: pointer;
+  accent-color: #4A9EFF;
+}
+
+input[type="color"] {
+  width: 44px;
+  height: 36px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: none;
+}
+
+.upload-btn {
+  background: #4A9EFF;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: center;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.upload-btn:active {
+  background: #3A8EEF;
+}
+
+.slider-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.slider-label {
+  min-width: 80px;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.slider-value {
+  min-width: 40px;
+  text-align: right;
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+#cameraPanel {
+  bottom: 16px;
+}
+
+#photoPanel {
+  bottom: 100px;
+}
+
+.divider {
+  height: 1px;
+  background: rgba(255,255,255,0.1);
+  margin: 4px 0;
 }
 </style>
 </head>
@@ -94,216 +215,493 @@ video {
   <video id="camera" autoplay playsinline></video>
 
   <div id="overlay">
-    <img id="overlayImg">
-    <div class="overlay-handle tl"></div>
-    <div class="overlay-handle tr"></div>
-    <div class="overlay-handle bl"></div>
-    <div class="overlay-handle br"></div>
+    <canvas id="overlayImg"></canvas>
+  </div>
+</div>
+
+<!-- Photo Panel -->
+<div class="control-panel" id="photoPanel">
+  <div class="panel-header" id="photoHeader">
+    <span>Photo Overlay</span>
+    <span class="panel-toggle" id="photoToggle">▼</span>
+  </div>
+  <div class="panel-body" id="photoBody">
+    <label class="upload-btn">
+      Upload Image
+      <input type="file" id="imageUpload" accept="image/*" style="display:none">
+    </label>
+
+    <div class="divider"></div>
+
+    <div class="slider-group">
+      <span class="slider-label">Opacity</span>
+      <input type="range" id="opacitySlider" min="0" max="100" value="100">
+      <span class="slider-value" id="opacityValue">100%</span>
+    </div>
+
+    <div class="control-row">
+      <label><input type="checkbox" id="flipOverlay"> Flip Horizontal</label>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="control-row">
+      <label><input type="checkbox" id="removeColor"> Remove Background</label>
+    </div>
+
+    <div class="slider-group">
+      <span class="slider-label">Key Color</span>
+      <input type="color" id="keyColor" value="#00ff00">
+    </div>
+
+    <div class="slider-group">
+      <span class="slider-label">Tolerance</span>
+      <input type="range" id="tolerance" min="0" max="100" value="30">
+      <span class="slider-value" id="toleranceValue">30</span>
+    </div>
   </div>
 </div>
 
 <!-- Camera Panel -->
 <div class="control-panel" id="cameraPanel">
-  <div class="panel-header">
-    Camera Controls
-    <span id="cameraToggle">▼</span>
+  <div class="panel-header" id="cameraHeader">
+    <span>Camera Controls</span>
+    <span class="panel-toggle" id="cameraToggle">▼</span>
   </div>
   <div class="panel-body" id="cameraBody">
-    <label><input type="checkbox" id="flipCamera"> Flip Camera</label>
-    <label><input type="checkbox" id="useRearCamera"> Use Rear Camera</label>
-  </div>
-</div>
-
-<!-- Photo Panel -->
-<div class="control-panel" id="photoPanel" style="bottom: 90px;">
-  <div class="panel-header">
-    Photo Editing
-    <span id="photoToggle">▼</span>
-  </div>
-  <div class="panel-body" id="photoBody">
-    <label style="cursor:pointer">
-      Upload Image
-      <input type="file" id="imageUpload" accept="image/*" style="display:none">
-    </label>
-
-    <label>Opacity <input type="range" id="opacitySlider" min="0" max="1" step="0.05" value="1"></label>
-    <label><input type="checkbox" id="lockRatio" checked> Lock Ratio</label>
-    <label><input type="checkbox" id="flipOverlay"> Flip Overlay</label>
-    <label><input type="checkbox" id="removeColor"> Remove Color</label>
-    <label>Key Color <input type="color" id="keyColor" value="#ffffff"></label>
-    <label>Tolerance <input type="range" id="tolerance" min="0" max="100" value="20"></label>
+    <div class="control-row">
+      <label>
+        <span style="min-width: 100px;">Camera</span>
+        <select id="cameraSelect" style="flex: 1; padding: 8px 12px; border-radius: 6px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; font-size: 14px;">
+          <option value="loading">Loading cameras...</option>
+        </select>
+      </label>
+    </div>
+    <div class="control-row">
+      <label><input type="checkbox" id="flipCamera"> Flip Camera View</label>
+    </div>
   </div>
 </div>
 
 <script>
 /************************************
-  PANEL TOGGLE — starts CLOSED
+  PANEL TOGGLE
 *************************************/
-function setupPanel(toggleId, bodyId) {
+function setupPanel(headerId, toggleId, bodyId) {
+  const header = document.getElementById(headerId);
   const toggle = document.getElementById(toggleId);
   const body = document.getElementById(bodyId);
-  toggle.addEventListener("click", () => {
-    const open = body.style.display !== "flex";
-    body.style.display = open ? "flex" : "none";
-    toggle.textContent = open ? "▲" : "▼";
+  
+  header.addEventListener("click", () => {
+    const isOpen = body.classList.contains("open");
+    body.classList.toggle("open");
+    toggle.classList.toggle("open");
   });
 }
 
-setupPanel("cameraToggle", "cameraBody");
-setupPanel("photoToggle", "photoBody");
+setupPanel("cameraHeader", "cameraToggle", "cameraBody");
+setupPanel("photoHeader", "photoToggle", "photoBody");
 
 /************************************
   ELEMENTS
 *************************************/
 const camera = document.getElementById("camera");
 const overlay = document.getElementById("overlay");
-const overlayImg = document.getElementById("overlayImg");
+const overlayCanvas = document.getElementById("overlayImg");
+const ctx = overlayCanvas.getContext("2d", { willReadFrequently: true });
 const imageUpload = document.getElementById("imageUpload");
-const lockRatio = document.getElementById("lockRatio");
 const opacitySlider = document.getElementById("opacitySlider");
+const opacityValue = document.getElementById("opacityValue");
 const flipOverlay = document.getElementById("flipOverlay");
-const useRearCamera = document.getElementById("useRearCamera");
 const flipCamera = document.getElementById("flipCamera");
+const cameraSelect = document.getElementById("cameraSelect");
+const removeColor = document.getElementById("removeColor");
+const keyColor = document.getElementById("keyColor");
+const tolerance = document.getElementById("tolerance");
+const toleranceValue = document.getElementById("toleranceValue");
+
+let originalImage = null;
 
 /************************************
-  CAMERA — FRONT/BACK SWITCH
+  CAMERA — ENUMERATE & SELECT
 *************************************/
 let currentStream = null;
+let availableCameras = [];
 
-async function startCamera(useRear = false) {
-  // stop previous stream
+async function enumerateCameras() {
+  try {
+    // First request camera permission
+    const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    tempStream.getTracks().forEach(track => track.stop());
+    
+    // Now enumerate devices
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    availableCameras = devices.filter(device => device.kind === 'videoinput');
+    
+    // Populate dropdown
+    cameraSelect.innerHTML = '';
+    availableCameras.forEach((camera, index) => {
+      const option = document.createElement('option');
+      option.value = camera.deviceId;
+      
+      // Create friendly labels
+      let label = camera.label || `Camera ${index + 1}`;
+      
+      // Simplify common labels
+      if (label.includes('back') || label.includes('rear')) {
+        label = label.includes('wide') ? 'Back Wide' : 
+                label.includes('ultra') ? 'Back Ultra Wide' :
+                label.includes('tele') ? 'Back Telephoto' : 'Back Camera';
+      } else if (label.includes('front') || label.includes('face')) {
+        label = 'Front Camera';
+      }
+      
+      option.textContent = label;
+      cameraSelect.appendChild(option);
+    });
+    
+    // Select rear camera by default (prefer main back camera)
+    const rearCamera = availableCameras.find(cam => 
+      cam.label.toLowerCase().includes('back') && 
+      !cam.label.toLowerCase().includes('ultra') &&
+      !cam.label.toLowerCase().includes('wide')
+    ) || availableCameras.find(cam => 
+      cam.label.toLowerCase().includes('back') ||
+      cam.label.toLowerCase().includes('rear') ||
+      cam.label.toLowerCase().includes('environment')
+    ) || availableCameras[0];
+    
+    if (rearCamera) {
+      cameraSelect.value = rearCamera.deviceId;
+      await startCamera(rearCamera.deviceId);
+    }
+    
+  } catch (err) {
+    console.error("Error enumerating cameras:", err);
+    cameraSelect.innerHTML = '<option>Camera access denied</option>';
+  }
+}
+
+async function startCamera(deviceId) {
   if (currentStream) {
     currentStream.getTracks().forEach(track => track.stop());
   }
 
   const constraints = {
     video: {
-      facingMode: useRear ? { exact: "environment" } : "user"
+      deviceId: deviceId ? { exact: deviceId } : undefined,
+      width: { ideal: 1920 },
+      height: { ideal: 1080 }
     }
   };
 
   try {
     currentStream = await navigator.mediaDevices.getUserMedia(constraints);
     camera.srcObject = currentStream;
-
-    // Auto-mirror ONLY the front camera
-    camera.classList.toggle("flipped", !useRear);
-
+    
+    // Check if this is a front camera for auto-flip
+    const currentCamera = availableCameras.find(cam => cam.deviceId === deviceId);
+    const isFrontCamera = currentCamera && 
+      (currentCamera.label.toLowerCase().includes('front') || 
+       currentCamera.label.toLowerCase().includes('face') ||
+       currentCamera.label.toLowerCase().includes('user'));
+    
+    camera.classList.toggle("flipped", isFrontCamera && !flipCamera.checked);
   } catch (err) {
     console.error("Camera error:", err);
-
-    // fallback if rear cam isn't available
-    if (useRear) {
-      console.warn("Rear camera not available, falling back to front.");
-      useRearCamera.checked = false;
-      startCamera(false);
-    }
   }
 }
 
-// Start with the front camera
-startCamera(false);
+// Initialize cameras
+enumerateCameras();
 
-// Handle toggle
-useRearCamera.addEventListener("change", e => {
-  startCamera(e.target.checked);
+// Handle camera selection
+cameraSelect.addEventListener("change", e => {
+  startCamera(e.target.value);
 });
 
-// Manual flip override
 flipCamera.addEventListener("change", () => {
-  camera.classList.toggle("flipped", flipCamera.checked);
+  camera.classList.toggle("flipped");
 });
 
 /************************************
   OVERLAY TRANSFORM STATE
 *************************************/
-let isDragging = false;
-let startX, startY, offsetX, offsetY;
-let initialDistance = 0, initialAngle = 0;
-let initialScale = 1, currentScale = 1;
-let initialRotation = 0, currentRotation = 0;
+let overlayState = {
+  x: 0,
+  y: 0,
+  scale: 1,
+  rotation: 0
+};
+
+let gestureState = {
+  isDragging: false,
+  initialTouch: null,
+  initialOverlayPos: null,
+  initialPinchDistance: 0,
+  initialPinchScale: 1,
+  initialPinchRotation: 0
+};
 
 /************************************
-  TOUCH / GESTURE
+  TOUCH GESTURES (FIXED)
 *************************************/
 overlay.addEventListener("touchstart", e => {
+  if (!overlay.style.display || overlay.style.display === "none") return;
   e.preventDefault();
+  e.stopPropagation();
+
+  overlay.classList.add("active");
 
   if (e.touches.length === 1) {
-    const t = e.touches[0];
-    isDragging = true;
-    startX = t.clientX;
-    startY = t.clientY;
-    offsetX = overlay.offsetLeft;
-    offsetY = overlay.offsetTop;
-  }
-
-  if (e.touches.length === 2) {
-    const [a, b] = e.touches;
-    initialDistance = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
-    initialAngle = Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX);
-    initialScale = currentScale;
-    initialRotation = currentRotation;
+    // Single touch - drag
+    gestureState.isDragging = true;
+    gestureState.initialTouch = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY
+    };
+    gestureState.initialOverlayPos = {
+      x: overlayState.x,
+      y: overlayState.y
+    };
+  } else if (e.touches.length === 2) {
+    // Two fingers - pinch and rotate
+    gestureState.isDragging = false;
+    
+    const touch1 = e.touches[0];
+    const touch2 = e.touches[1];
+    
+    const dx = touch2.clientX - touch1.clientX;
+    const dy = touch2.clientY - touch1.clientY;
+    
+    gestureState.initialPinchDistance = Math.sqrt(dx * dx + dy * dy);
+    gestureState.initialPinchScale = overlayState.scale;
+    gestureState.initialPinchRotation = overlayState.rotation;
+    gestureState.initialPinchAngle = Math.atan2(dy, dx) * 180 / Math.PI;
   }
 });
 
 overlay.addEventListener("touchmove", e => {
+  if (!overlay.style.display || overlay.style.display === "none") return;
   e.preventDefault();
+  e.stopPropagation();
 
-  if (e.touches.length === 1 && isDragging) {
-    const t = e.touches[0];
-    overlay.style.left = offsetX + (t.clientX - startX) + "px";
-    overlay.style.top = offsetY + (t.clientY - startY) + "px";
-  }
-
-  if (e.touches.length === 2) {
-    const [a, b] = e.touches;
-    let dist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
-    let angle = Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX);
-
-    currentScale = initialScale * (dist / initialDistance);
-    currentRotation = initialRotation + (angle - initialAngle) * 180 / Math.PI;
-
-    updateTransform();
+  if (e.touches.length === 1 && gestureState.isDragging) {
+    // Drag
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - gestureState.initialTouch.x;
+    const deltaY = touch.clientY - gestureState.initialTouch.y;
+    
+    overlayState.x = gestureState.initialOverlayPos.x + deltaX;
+    overlayState.y = gestureState.initialOverlayPos.y + deltaY;
+    
+    updateOverlayTransform();
+  } else if (e.touches.length === 2) {
+    // Pinch and rotate
+    const touch1 = e.touches[0];
+    const touch2 = e.touches[1];
+    
+    const dx = touch2.clientX - touch1.clientX;
+    const dy = touch2.clientY - touch1.clientY;
+    
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    
+    // Update scale
+    const scaleFactor = distance / gestureState.initialPinchDistance;
+    overlayState.scale = gestureState.initialPinchScale * scaleFactor;
+    
+    // Update rotation
+    const angleDelta = angle - gestureState.initialPinchAngle;
+    overlayState.rotation = gestureState.initialPinchRotation + angleDelta;
+    
+    updateOverlayTransform();
   }
 });
 
-overlay.addEventListener("touchend", () => {
-  isDragging = false;
+overlay.addEventListener("touchend", e => {
+  e.preventDefault();
+  if (e.touches.length === 0) {
+    gestureState.isDragging = false;
+    overlay.classList.remove("active");
+  } else if (e.touches.length === 1) {
+    // Transition from pinch back to drag
+    gestureState.isDragging = true;
+    gestureState.initialTouch = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY
+    };
+    gestureState.initialOverlayPos = {
+      x: overlayState.x,
+      y: overlayState.y
+    };
+  }
 });
 
 /************************************
-  MOUSE WHEEL ROTATE/ZOOM
+  MOUSE WHEEL (DESKTOP)
 *************************************/
 overlay.addEventListener("wheel", e => {
   e.preventDefault();
-  if (e.shiftKey) currentRotation += e.deltaY < 0 ? 3 : -3;
-  else currentScale += e.deltaY < 0 ? 0.05 : -0.05;
-
-  updateTransform();
+  
+  if (e.shiftKey) {
+    overlayState.rotation += e.deltaY < 0 ? 5 : -5;
+  } else {
+    overlayState.scale += e.deltaY < 0 ? 0.05 : -0.05;
+    overlayState.scale = Math.max(0.1, Math.min(5, overlayState.scale));
+  }
+  
+  updateOverlayTransform();
 });
 
 /************************************
-  APPLY TRANSFORM
+  UPDATE TRANSFORM
 *************************************/
-function updateTransform() {
-  const flip = flipOverlay.checked ? -1 : 1;
-  overlay.style.transform = `scale(${currentScale * flip}) rotate(${currentRotation}deg)`;
+function updateOverlayTransform() {
+  const flipX = flipOverlay.checked ? -1 : 1;
+  overlay.style.transform = `translate(${overlayState.x}px, ${overlayState.y}px) scale(${overlayState.scale * flipX}, ${overlayState.scale}) rotate(${overlayState.rotation}deg)`;
 }
 
-opacitySlider.addEventListener("input", () => overlay.style.opacity = opacitySlider.value);
-flipOverlay.addEventListener("change", updateTransform);
+/************************************
+  OPACITY SLIDER
+*************************************/
+opacitySlider.addEventListener("input", () => {
+  const value = opacitySlider.value;
+  overlay.style.opacity = value / 100;
+  opacityValue.textContent = value + "%";
+});
+
+/************************************
+  TOLERANCE SLIDER
+*************************************/
+tolerance.addEventListener("input", () => {
+  toleranceValue.textContent = tolerance.value;
+  if (removeColor.checked && originalImage) {
+    applyChromaKey();
+  }
+});
+
+/************************************
+  FLIP OVERLAY
+*************************************/
+flipOverlay.addEventListener("change", () => {
+  updateOverlayTransform();
+});
+
+/************************************
+  CHROMA KEY (BACKGROUND REMOVAL)
+*************************************/
+function hexToRgb(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : null;
+}
+
+function applyChromaKey() {
+  if (!originalImage) return;
+  
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = originalImage.width;
+  tempCanvas.height = originalImage.height;
+  const tempCtx = tempCanvas.getContext('2d');
+  
+  tempCtx.drawImage(originalImage, 0, 0);
+  const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+  const data = imageData.data;
+  
+  const keyRgb = hexToRgb(keyColor.value);
+  const threshold = parseInt(tolerance.value) * 2.55; // Convert 0-100 to 0-255
+  
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    
+    const diff = Math.sqrt(
+      Math.pow(r - keyRgb.r, 2) +
+      Math.pow(g - keyRgb.g, 2) +
+      Math.pow(b - keyRgb.b, 2)
+    );
+    
+    if (diff < threshold) {
+      data[i + 3] = 0; // Make transparent
+    }
+  }
+  
+  tempCtx.putImageData(imageData, 0, 0);
+  
+  overlayCanvas.width = tempCanvas.width;
+  overlayCanvas.height = tempCanvas.height;
+  ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  ctx.drawImage(tempCanvas, 0, 0);
+}
+
+function renderOriginalImage() {
+  if (!originalImage) return;
+  
+  overlayCanvas.width = originalImage.width;
+  overlayCanvas.height = originalImage.height;
+  ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  ctx.drawImage(originalImage, 0, 0);
+}
+
+/************************************
+  REMOVE COLOR TOGGLE
+*************************************/
+removeColor.addEventListener("change", () => {
+  if (removeColor.checked) {
+    applyChromaKey();
+  } else {
+    renderOriginalImage();
+  }
+});
+
+keyColor.addEventListener("input", () => {
+  if (removeColor.checked && originalImage) {
+    applyChromaKey();
+  }
+});
 
 /************************************
   IMAGE UPLOAD
 *************************************/
 imageUpload.addEventListener("change", e => {
-  let file = e.target.files[0];
+  const file = e.target.files[0];
   if (!file) return;
-  let reader = new FileReader();
+  
+  const reader = new FileReader();
   reader.onload = evt => {
-    overlayImg.src = evt.target.result;
-    overlay.style.display = "block";
+    const img = new Image();
+    img.onload = () => {
+      originalImage = img;
+      
+      // Set initial size (max 400px)
+      const maxSize = 400;
+      const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+      overlayCanvas.width = img.width;
+      overlayCanvas.height = img.height;
+      overlay.style.width = (img.width * scale) + "px";
+      overlay.style.height = (img.height * scale) + "px";
+      
+      // Reset position to center
+      overlayState.x = 0;
+      overlayState.y = 0;
+      overlayState.scale = 1;
+      overlayState.rotation = 0;
+      
+      if (removeColor.checked) {
+        applyChromaKey();
+      } else {
+        renderOriginalImage();
+      }
+      
+      overlay.style.display = "block";
+      updateOverlayTransform();
+    };
+    img.src = evt.target.result;
   };
   reader.readAsDataURL(file);
 });
